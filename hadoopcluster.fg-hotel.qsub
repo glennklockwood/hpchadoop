@@ -1,0 +1,35 @@
+#!/bin/bash
+################################################################################
+#
+#  Job script to spin up a semi-persistent Hadoop cluster on FutureGrid Hotel
+#
+#  Glenn K. Lockwood, San Diego Supercomputer Center                 June 2013
+#
+################################################################################
+#PBS -N hadoopcluster
+#PBS -l nodes=4:ppn=8
+#PBS -l walltime=12:00:00
+#PBS -q batch
+#PBS -j oe
+#PBS -o hadoopcluster.log
+#PBS -V
+ 
+module add java
+cd $PBS_O_WORKDIR
+ 
+export MY_HADOOP_HOME="/soft/myhadoop/0.2a"
+source $MY_HADOOP_HOME/bin/setenv.sh
+export HADOOP_LOG_DIR=$PBS_O_WORKDIR/$PBS_JOBID.logs
+ 
+export HADOOP_CONF_DIR=$PBS_O_WORKDIR/$PBS_JOBID
+$MY_HADOOP_HOME/bin/pbs-configure.sh -n 4 -c $HADOOP_CONF_DIR || exit 1
+ 
+$HADOOP_HOME/bin/hadoop --config $HADOOP_CONF_DIR namenode -format
+ 
+$HADOOP_HOME/bin/start-all.sh
+ 
+sleep $((12*3600-180))
+ 
+$HADOOP_HOME/bin/stop-all.sh
+cp -r $HADOOP_LOG_DIR $PBS_O_WORKDIR/hadoop-logs.$PBS_JOBID
+$MY_HADOOP_HOME/bin/pbs-cleanup.sh -n 4 -c $HADOOP_CONF_DIR

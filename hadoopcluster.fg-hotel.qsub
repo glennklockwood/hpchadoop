@@ -19,7 +19,6 @@ cd $PBS_O_WORKDIR
  
 export MY_HADOOP_HOME="/soft/myhadoop/0.2a"
 source $MY_HADOOP_HOME/bin/setenv.sh
-export HADOOP_LOG_DIR=$PBS_O_WORKDIR/$PBS_JOBID.logs
  
 export HADOOP_CONF_DIR=$PBS_O_WORKDIR/$PBS_JOBID
 $MY_HADOOP_HOME/bin/pbs-configure.sh -n 4 -c $HADOOP_CONF_DIR || exit 1
@@ -31,5 +30,5 @@ $HADOOP_HOME/bin/start-all.sh
 sleep $((12*3600-180))
  
 $HADOOP_HOME/bin/stop-all.sh
-cp -r $HADOOP_LOG_DIR $PBS_O_WORKDIR/hadoop-logs.$PBS_JOBID
+cp -Lr $HADOOP_LOG_DIR $PBS_O_WORKDIR/hadoop-logs.$PBS_JOBID
 $MY_HADOOP_HOME/bin/pbs-cleanup.sh -n 4 -c $HADOOP_CONF_DIR

@@ -34,8 +34,8 @@ sed -e 's/$/.ibnet0/g' $PBS_NODEFILE > $PBS_NODEFILEZ
 $MY_HADOOP_HOME/bin/configure.sh -n 4 -c $HADOOP_CONF_DIR || exit 1
 
 ### Gordon: myHadoop template environment has dummy vars that must be replaced
-sed -i 's:^export HADOOP_PID_DIR=:export HADOOP_PID_DIR=/scratch/'$USER'/'$PBS_JOBID':' $HADOOP_CONF_DIR/hadoop-env.sh
-sed -i 's:^export TMPDIR=/export:TMPDIR=/scratch/'$USER'/'$PBS_JOBID':' $HADOOP_CONF_DIR/hadoop-env.sh
+sed -i 's:^export HADOOP_PID_DIR=.*:export HADOOP_PID_DIR=/scratch/'$USER'/'$PBS_JOBID':' $HADOOP_CONF_DIR/hadoop-env.sh
+sed -i 's:^export TMPDIR=.*:export TMPDIR=/scratch/'$USER'/'$PBS_JOBID':' $HADOOP_CONF_DIR/hadoop-env.sh
  
 $HADOOP_HOME/bin/hadoop --config $HADOOP_CONF_DIR namenode -format
  

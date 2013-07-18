@@ -1,0 +1,69 @@
+#!/bin/bash
+################################################################################
+#
+#  Job script to launch the Hadoop streaming wordcount example on SDSC Gordon
+#
+#  Glenn K. Lockwood, San Diego Supercomputer Center                 July 2013
+#
+################################################################################
+#PBS -N hadoopcluster
+#PBS -l nodes=4:ppn=1:native
+#PBS -l walltime=00:15:00
+#PBS -q normal
+#PBS -j oe
+#PBS -o hadoopcluster.log
+#PBS -V
+
+#module add java                        # not necessary on Gordon
+cd $PBS_O_WORKDIR
+ 
+export MY_HADOOP_HOME="/opt/hadoop/contrib/myHadoop"
+#source $MY_HADOOP_HOME/bin/setenv.sh   # this file is not used on Gordon
+
+export HADOOP_CONF_DIR=$PBS_O_WORKDIR/$PBS_JOBID
+
+### Gordon: need to build setenv.sh from hardcoded values in configure.sh
+TMPFILE=$(mktemp)
+grep '^export' $MY_HADOOP_HOME/bin/configure.sh > $TMPFILE
+source $TMPFILE && rm $TMPFILE
+
+### Gordon: Enable Hadoop over Infiniband (add ".ibnet0" suffix to hostnames)
+export PBS_NODEFILEZ=$(mktemp)
+sed -e 's/$/.ibnet0/g' $PBS_NODEFILE > $PBS_NODEFILEZ
+
+$MY_HADOOP_HOME/bin/configure.sh -n 4 -c $HADOOP_CONF_DIR || exit 1
+
+### Gordon: myHadoop template environment has dummy vars that must be replaced
+sed -i 's:^export HADOOP_PID_DIR=.*:export HADOOP_PID_DIR=/scratch/'$USER'/'$PBS_JOBID':' $HADOOP_CONF_DIR/hadoop-env.sh
+sed -i 's:^export TMPDIR=.*:export TMPDIR=/scratch/'$USER'/'$PBS_JOBID':' $HADOOP_CONF_DIR/hadoop-env.sh
+ 
+$HADOOP_HOME/bin/hadoop --config $HADOOP_CONF_DIR namenode -format
+ 
+$HADOOP_HOME/bin/start-all.sh
+
+################################################################################
+$HADOOP_HOME/bin/hadoop dfs -mkdir wordcount
+$HADOOP_HOME/bin/hadoop dfs -copyFromLocal ./pg2701.txt wordcount/mobydick.txt
+$HADOOP_HOME/bin/hadoop jar /opt/hadoop/contrib/streaming/hadoop-streaming-1.0.3.jar \
+    -D mapred.map.tasks=4 \
+    -mapper "perl $PWD/mapper.pl" \
+    -reducer "perl $PWD/reducer.pl" \
+    -input wordcount/mobydick.txt \
+    -output wordcount/output
+
+echo "*** Copying output data back to local filesystem"
+$HADOOP_HOME/bin/hadoop dfs -copyToLocal data/output ./output
+
+echo "*** Printing job status"
+jobid=$($HADOOP_HOME/bin/hadoop job -list all | tail -n1 | awk '{print $1}')
+$HADOOP_HOME/bin/hadoop job -status $jobid
+echo "*** Printing job history"
+$HADOOP_HOME/bin/hadoop job -history wordcount/output
+echo "*** Printing all events associated with job"
+$HADOOP_HOME/bin/hadoop job -events 0 100
+
+################################################################################
+
+$HADOOP_HOME/bin/stop-all.sh
+cp -Lr $HADOOP_LOG_DIR $PBS_O_WORKDIR/hadoop-logs.$PBS_JOBID
+$MY_HADOOP_HOME/bin/pbs-cleanup.sh -n 4

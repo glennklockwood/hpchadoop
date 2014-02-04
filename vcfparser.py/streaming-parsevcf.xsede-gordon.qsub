@@ -6,13 +6,13 @@
 #  Glenn K. Lockwood, San Diego Supercomputer Center                 July 2013
 #
 ################################################################################
-#PBS -N hadoopcluster
+#PBS -N vcfparse
 #PBS -l nodes=4:ppn=1:native
 #PBS -l walltime=00:15:00
 #PBS -q normal
 #PBS -j oe
 #PBS -o hadoopcluster.log
-#PBS -v Catalina_maxhops=None
+#PBS -V
 
 cd $PBS_O_WORKDIR
  
@@ -40,28 +40,33 @@ $HADOOP_HOME/bin/hadoop --config $HADOOP_CONF_DIR namenode -format
 $HADOOP_HOME/bin/start-all.sh
 
 ################################################################################
-source /etc/profile.d/modules.sh
-module load python/2.7.3
+# Load the python2.7 module, then activate our personal virtualenv
+module load python
+source ~/mypython/bin/activate
 
-$HOME/mypython/bin/python $PWD/vcfparser.py -b HT020.raw.vcf > header.txt
+# Preprocess our VCF file and extract the header
+python $PWD/parsevcf.py -b ./data.vcf > $PWD/header.txt
 
-$HADOOP_HOME/bin/hadoop dfs -mkdir data
-$HADOOP_HOME/bin/hadoop dfs -copyFromLocal ./HT020.raw.vcf data/
-$HADOOP_HOME/bin/hadoop jar /opt/hadoop/contrib/streaming/hadoop-streaming-1.0.3.jar \
-    -D mapred.map.tasks=4 \
-    -mapper "$HOME/mypython/bin/python $PWD/vcfparser.py -m $PWD/header.txt" \
-    -reducer "/bin/cat" \
-    -input data/HT020.raw.vcf \
-    -output data/output \
+# Copy input VCF into HDFS
+$HADOOP_HOME/bin/hadoop dfs -mkdir vcfparse
+$HADOOP_HOME/bin/hadoop dfs -copyFromLocal ./data.vcf vcfparse/
+
+# Launch the Hadoop streaming job, being sure to share our python2.7 library 
+# location with Hadoop and use absolute paths to everything
+$HADOOP_HOME/bin/hadoop jar /opt/hadoop/contrib/streaming/hadoop-streaming-1.1.1.jar \
+    -mapper "$(which python) $PWD/parsevcf.py -m $PWD/header.txt,0.30" \
+    -reducer "$(which python) $PWD/parsevcf.py -r" \
+    -input vcfparse/data.vcf \
+    -output vcfparse/output \
     -cmdenv LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 
-echo "*** Copying output data back to local filesystem"
-$HADOOP_HOME/bin/hadoop dfs -copyToLocal data/output ./output
+# Copy output data back out of HDFS
+$HADOOP_HOME/bin/hadoop dfs -copyToLocal vcfparse/output $PWD/output
 
+# Print information on how many mappers/reducers were used
 echo "*** Printing job status"
 jobid=$($HADOOP_HOME/bin/hadoop job -list all | tail -n1 | awk '{print $1}')
 $HADOOP_HOME/bin/hadoop job -status $jobid
-
 ################################################################################
 
 $HADOOP_HOME/bin/stop-all.sh

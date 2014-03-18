@@ -12,3 +12,9 @@ Sample projects and code are also included:
 * wordcount.py - the canonical word count example implemented in Python, Perl, and R
 * coord - coordination analysis for molecular dynamics simulations (we did not 
   cover this in class, and the documentation is incomplete)
+
+I've also provided the starthadoop.sh script, which contains the commands you
+will need to type to get into an interactive session and spin up a Hadoop 
+cluster.  Each subdirectory also contains a "submit.qsub" command to run the
+entire example non-interactively.  You can examine these scripts to see the
+commands you would type to run the examples interactively.

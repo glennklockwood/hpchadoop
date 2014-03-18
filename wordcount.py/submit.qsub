@@ -1,0 +1,57 @@
+#!/bin/bash
+################################################################################
+#
+#  Job script to launch the Hadoop streaming wordcount example on SDSC Gordon
+#
+#  Glenn K. Lockwood, San Diego Supercomputer Center                 July 2013
+#
+################################################################################
+#PBS -N wordcount
+#PBS -l nodes=2:ppn=16:native
+#PBS -l walltime=00:15:00
+#PBS -q normal
+#PBS -j oe
+#PBS -v Catalina_maxhops=None
+
+cd $PBS_O_WORKDIR
+ 
+### Load our Hadoop environment module
+export MODULEPATH=/home/diag/opt/modulefiles/applications:$MODULEPATH
+module load hadoop/1.0.4
+
+### Configure the Hadoop cluster
+export HADOOP_CONF_DIR=$PBS_O_WORKDIR/hadoop-conf.$PBS_JOBID
+myhadoop-configure.sh -s /scratch/$USER/$PBS_JOBID
+
+### Start the Hadoop cluster
+start-all.sh
+
+# Make a directory for our input data
+hadoop dfs -mkdir streaming-input
+
+# Copy the text of Moby Dick to HDFS, and name it mobydick.txt there.  This way 
+# we know that all references to a file called "pg2701.txt" refer to the file 
+# on the local filesystem, and all references to "mobydick.txt" refer to HDFS.
+hadoop dfs -put ./pg2701.txt streaming-input/mobydick.txt
+
+# Run the mapreduce job using Hadoop streaming
+hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-streaming-*.jar \
+    -D mapred.reduce.tasks=2 \
+    -mapper "$PWD/mapper.py" \
+    -reducer "$PWD/reducer.py" \
+    -input streaming-input/mobydick.txt \
+    -output streaming-output \
+    -cmdenv PATH=$PATH \
+    -cmdenv LD_LIBRARY_PATH=$LD_LIBRARY_PATH
+
+
+
+# Copy the output back to the local filesystem
+hadoop dfs -get streaming-output/part-* .
+
+# Print the job stats
+hadoop job -history streaming-output
+
+### Clean up
+stop-all.sh
+myhadoop-cleanup.sh

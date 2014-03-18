@@ -8,11 +8,10 @@ These files are designed to run on SDSC Gordon, and the tutorial uses the text o
 
 * mapper.py - The mapper script
 * reducer.py - The reducer script
-* streaming-wordcount-py.xsede-gordon.qsub - The submit script that will run the Hadoop streaming with mapper.py and reducer.py non-interactively
+* submit.qsub - The submit script that will run the Hadoop streaming with mapper.py and reducer.py non-interactively
 
-For people more comfortable with Perl, I also wrote the same mappers/reducers in that language.  A submit script (virtually identical) is also included:
+For people more comfortable with Perl or R, I've provided the same functionality in those languages as well:
 * mapper.pl
 * reducer.pl
-* streaming-wordcount-pl.xsede-gordon.qsub
-
-
+* mapper.R
+* reducer.R

@@ -1,0 +1,54 @@
+#!/bin/bash
+################################################################################
+#
+#  Job script to launch the Hadoop VCF parsing example on SDSC Gordon
+#
+#  Glenn K. Lockwood, San Diego Supercomputer Center                 July 2013
+#
+################################################################################
+#PBS -N vcfparse
+#PBS -l nodes=2:ppn=16:native
+#PBS -l walltime=00:15:00
+#PBS -q normal
+#PBS -j oe
+#PBS -v Catalina_maxhops=None
+
+cd $PBS_O_WORKDIR
+ 
+### Load our Hadoop environment module
+export MODULEPATH=/home/diag/opt/modulefiles/applications:$MODULEPATH
+module load hadoop/1.0.4
+
+### Configure the Hadoop cluster
+export HADOOP_CONF_DIR=$PBS_O_WORKDIR/hadoop-conf.$PBS_JOBID
+myhadoop-configure.sh -s /scratch/$USER/$PBS_JOBID
+
+### Start the Hadoop cluster
+start-all.sh
+
+### Preprocess our VCF file and extract the header
+./preprocess.py ./sample.vcf > header.txt
+
+### Copy input VCF into HDFS
+hadoop dfs -mkdir readvcf-input
+hadoop dfs -put ./sample.vcf readvcf-input/
+
+### Launch the Hadoop streaming job, being sure to share our python2.7 library 
+### location with Hadoop and use absolute paths to everything
+hadoop jar $HADOOP_HOME/contrib/streaming/hadoop-streaming-*.jar \
+    -D mapred.reduce.tasks=0 \
+    -mapper "$PWD/readvcf.py $PWD/header.txt,0.30" \
+    -input readvcf-input/sample.vcf \
+    -output readvcf-output \
+    -cmdenv PATH=$PATH \
+    -cmdenv LD_LIBRARY_PATH=$LD_LIBRARY_PATH
+
+### Copy output data back out of HDFS
+hadoop dfs -get readvcf-output/part-* .
+
+### Print information on how many mappers/reducers were used
+hadoop job -history readvcf-output
+
+### Clean up
+stop-all.sh
+myhadoop-cleanup.sh
